@@ -1,16 +1,28 @@
 require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
+// const jwt = require('jsonwebtoken');
+const http = require('http');
+const socketIo = require('socket.io');
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO with the HTTP server
+const io = socketIo(server, {
+  cors: {
+    origin: "*", // Allow any origin, adjust as needed
+    methods: ["GET", "POST"]
+  }
+});
+
 //middleware
 app.use(cors());
 app.use(express.json());
-
-
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uoi62.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -41,7 +53,18 @@ async function run() {
     //   res.send(result);
     // });
 
-    app.patch('/tasks/:id',async (req, res) => {
+    app.delete('/tasks/:id',async (req, res) => {
+      const id = req.params.id;
+      // console.log(id);
+      const query = { _id: new ObjectId(id) }
+      // console.log(query);
+      const result = await taskCollection.deleteOne(query);
+      res.send(result);
+       // Emit an event when task is deleted
+       io.emit('taskDeleted', { taskId: id });
+    })
+
+    app.put('/tasks/:id',async (req, res) => {
       const allTasks = req.body
       const  id  = req.params.id; 
       const query = { _id: new ObjectId(id) }; 
@@ -54,6 +77,8 @@ async function run() {
       }
       const result = await taskCollection.updateOne(query, update);
       res.send(result);
+
+      io.emit('taskUpdated', { taskId: id, updatedTask: allTasks });
     });
 
     app.get('/tasks/:email', async (req, res) => {
@@ -70,6 +95,9 @@ async function run() {
       const item = req.body;
       const result = await taskCollection.insertOne(item);
       res.send(result);
+
+        // Emit an event when a new task is created
+        io.emit('taskCreated', { task: item });
     });
 
 
@@ -109,6 +137,19 @@ async function run() {
 run().catch(console.dir);
 
 
+//Socket.IO event listener for new connections
+io.on('connection', (socket) => {
+  console.log('A user connected');
+  
+  // Listen for events from the client
+  socket.on('taskAdded', (task) => {
+    console.log('New task added:', task);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('A user disconnected');
+  });
+});
 
 
 
