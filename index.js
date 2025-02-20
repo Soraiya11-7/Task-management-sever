@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 //middleware
@@ -40,6 +40,30 @@ async function run() {
     //   const result = await taskCollection.find().toArray();
     //   res.send(result);
     // });
+
+    app.patch('/tasks/:id',async (req, res) => {
+      const allTasks = req.body
+      const  id  = req.params.id; 
+      const query = { _id: new ObjectId(id) }; 
+      const update = {
+        $set: {
+          title: allTasks.title,
+          category: allTasks.category,
+          description: allTasks.description,
+        }
+      }
+      const result = await taskCollection.updateOne(query, update);
+      res.send(result);
+    });
+
+    app.get('/tasks/:email', async (req, res) => {
+      const { email } = req.params;
+      const query = {userEmail: email };
+      console.log(query)
+      const result = await taskCollection.find(query).toArray();
+      console.log(result)
+      res.send(result);
+    })
 
 //create task......
     app.post('/tasks', async (req, res) => {
